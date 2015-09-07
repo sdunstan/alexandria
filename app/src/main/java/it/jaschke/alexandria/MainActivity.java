@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Configuration;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
@@ -15,12 +17,14 @@ import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import it.jaschke.alexandria.api.Callback;
+import it.jaschke.alexandria.camera.CameraPreview;
 
 
-public class MainActivity extends ActionBarActivity implements NavigationDrawerFragment.NavigationDrawerCallbacks, Callback {
+public class MainActivity extends ActionBarActivity implements NavigationDrawerFragment.NavigationDrawerCallbacks, Callback, ScanBarcode.OnScanBarcodeListener {
 
     /**
      * Fragment managing the behaviors, interactions and presentation of the navigation drawer.
@@ -41,15 +45,15 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         IS_TABLET = isTablet();
-        if(IS_TABLET){
+        if (IS_TABLET) {
             setContentView(R.layout.activity_main_tablet);
-        }else {
+        } else {
             setContentView(R.layout.activity_main);
         }
 
         messageReciever = new MessageReciever();
         IntentFilter filter = new IntentFilter(MESSAGE_EVENT);
-        LocalBroadcastManager.getInstance(this).registerReceiver(messageReciever,filter);
+        LocalBroadcastManager.getInstance(this).registerReceiver(messageReciever, filter);
 
         navigationDrawerFragment = (NavigationDrawerFragment)
                 getSupportFragmentManager().findFragmentById(R.id.navigation_drawer);
@@ -57,8 +61,14 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
 
         // Set up the drawer.
         navigationDrawerFragment.setUp(R.id.navigation_drawer,
-                    (DrawerLayout) findViewById(R.id.drawer_layout));
+                (DrawerLayout) findViewById(R.id.drawer_layout));
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                new ScanBarcodeReceiver(),
+                new IntentFilter(CameraPreview.BROADCAST_ACTION));
     }
+
+
 
     @Override
     public void onNavigationDrawerItemSelected(int position) {
@@ -151,6 +161,38 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
 
     }
 
+    public void pushScanBarcodeFragment() {
+        ScanBarcode fragment = ScanBarcode.newInstance();
+        int id = R.id.container;
+        if(findViewById(R.id.right_container) != null){
+            id = R.id.right_container;
+        }
+        getSupportFragmentManager().beginTransaction()
+                .replace(id, fragment)
+                .addToBackStack("ScanBarcode")
+                .commit();
+    }
+
+    public void popScanBarcodeFragment() {
+        getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
+    }
+
+
+    @Override
+    public void onBarcodeDecoded(String barcodeString) {
+        popScanBarcodeFragment();
+        // TODO: set decoded string into lookup field
+    }
+
+    public void scanClicked(View view) {
+        View viewWithFocus = this.getCurrentFocus();
+        if (viewWithFocus != null) {
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+        }
+        pushScanBarcodeFragment();
+    }
+
     private class MessageReciever extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -176,6 +218,17 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
             finish();
         }
         super.onBackPressed();
+    }
+
+    public class ScanBarcodeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String result = intent.getStringExtra(CameraPreview.EXTRA_PARSE_RESULT);
+            if (result != null) {
+//                ean.setText(result);
+//                getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            }
+        }
     }
 
 

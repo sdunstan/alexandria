@@ -10,6 +10,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.hardware.Camera;
 import android.os.AsyncTask;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -17,7 +18,6 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.WindowManager;
-import android.widget.Toast;
 
 import com.google.zxing.BinaryBitmap;
 import com.google.zxing.DecodeHintType;
@@ -32,11 +32,12 @@ import com.google.zxing.oned.MultiFormatOneDReader;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-import it.jaschke.alexandria.CameraHelper;
-import it.jaschke.alexandria.R;
+import it.jaschke.alexandria.util.CameraHelper;
 
-/** A basic Camera preview class */
 public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback, Camera.AutoFocusCallback {
     public static final String BROADCAST_ACTION = "it.jaschkle.alexandria.BROADCAST_ACTION";
     public static final String EXTRA_PARSE_RESULT = "it.jaschkle.alexandria.PARSE_RESULT";
@@ -46,8 +47,11 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     private static final int TARGET_RATIO_HEIGHT = 3;
 
     private Camera mCamera;
-    private int mTryCount = 0;
     private boolean isPortriat = true;
+
+    private Context mContext;
+
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public CameraPreview(Context context) {
         super(context);
@@ -69,6 +73,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     }
 
     public void init(Context context) {
+        mContext = context;
         // Install a SurfaceHolder.Callback so we get notified when the
         // underlying surface is created and destroyed.
         getHolder().addCallback(this);
@@ -103,6 +108,17 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         getHolder().setFixedSize(size.width, size.height);
 
         mCamera.setParameters(parameters);
+
+        scheduleAutofocus();
+    }
+
+    private void scheduleAutofocus() {
+        scheduler.schedule(new Runnable() {
+            @Override
+            public void run() {
+                autoFocus();
+            }
+        }, 1, TimeUnit.SECONDS);
     }
 
     /**
@@ -190,44 +206,10 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         mCamera.setDisplayOrientation(degrees);
     }
 
-    public Camera.Size getSize() {
-        if (!hasCamera())
-            return null;
-        return mCamera.getParameters().getPreviewSize();
-    }
-
     public void autoFocus() {
         if (!hasCamera())
             return;
         mCamera.autoFocus(this);
-    }
-
-    public void snap() {
-        if (!hasCamera())
-            return;
-        mTryCount = 0;
-        autoFocus();
-    }
-
-    private void _snap() {
-        if (mTryCount < 10) {
-            mTryCount++;
-            mCamera.setOneShotPreviewCallback(new Camera.PreviewCallback() {
-                @Override
-                public void onPreviewFrame(byte[] bytes, Camera camera) {
-                    Log.i(TAG, "Got preview frame..." + (bytes != null ? bytes.length : 0));
-                    if (bytes != null && bytes.length > 0) {
-                        Camera.Size size = camera.getParameters().getPreviewSize();
-                        RawImage raw = new RawImage(bytes, size.width, size.height);
-                        new ScanBarcodeTask().execute(raw);
-                    }
-                }
-            });
-        }
-        else {
-            Toast toast = Toast.makeText(getContext(), getContext().getResources().getString(R.string.ReadBarcodeFailure), Toast.LENGTH_SHORT);
-            toast.show();
-        }
     }
 
     private void broadcastResult(String result) {
@@ -239,7 +221,19 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     @Override
     public void onAutoFocus(boolean b, Camera camera) {
         Log.d(TAG, "Got autofocus");
-        _snap();
+        if (camera != null) {
+            camera.setOneShotPreviewCallback(new Camera.PreviewCallback() {
+                @Override
+                public void onPreviewFrame(byte[] bytes, Camera camera) {
+                    Log.i(TAG, "Got preview frame..." + (bytes != null ? bytes.length : 0));
+                    if (bytes != null && bytes.length > 0) {
+                        Camera.Size size = camera.getParameters().getPreviewSize();
+                        RawImage raw = new RawImage(bytes, size.width, size.height);
+                        new ScanBarcodeTask().execute(raw);
+                    }
+                }
+            });
+        }
     }
 
     private class ScanBarcodeTask extends AsyncTask<RawImage, Integer, String> {
@@ -280,10 +274,12 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         @Override
         protected void onPostExecute(String result) {
             if (result == null) {
-                _snap();
+                scheduleAutofocus();
             }
             else {
                 broadcastResult(result);
+//                ean.setText(result);
+//                mContext.getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
             }
         }
     }

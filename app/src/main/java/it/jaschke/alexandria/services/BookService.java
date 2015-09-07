@@ -20,6 +20,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import it.jaschke.alexandria.MainActivity;
+import it.jaschke.alexandria.util.NetworkUtil;
 import it.jaschke.alexandria.R;
 import it.jaschke.alexandria.data.AlexandriaContract;
 
@@ -66,13 +67,17 @@ public class BookService extends IntentService {
         }
     }
 
+    private boolean hasNetwork() {
+        return NetworkUtil.isNetworkAvailable(this);
+    }
+
     /**
      * Handle action fetchBook in the provided background thread with the provided
      * parameters.
      */
     private void fetchBook(String ean) {
 
-        if(noNetwork || ean.length()!=13){
+        if(!hasNetwork() || ean.length()!=13){
             return;
         }
 

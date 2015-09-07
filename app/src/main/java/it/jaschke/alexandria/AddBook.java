@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
 import android.support.v4.content.LocalBroadcastManager;
@@ -18,7 +19,6 @@ import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -27,9 +27,10 @@ import it.jaschke.alexandria.camera.CameraPreview;
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.BookService;
 import it.jaschke.alexandria.services.DownloadImage;
+import it.jaschke.alexandria.util.NetworkUtil;
 
 
-public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<Cursor>, Camera.AutoFocusCallback {
+public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
     private static final String TAG = "INTENT_TO_SCAN_ACTIVITY";
     private EditText ean;
     private final int LOADER_ID = 1;
@@ -40,9 +41,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
     private String mScanFormat = "Format:";
     private String mScanContents = "Contents:";
-
-
-    private CameraPreview mScanPreview;
 
     public AddBook(){
     }
@@ -60,7 +58,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
         rootView = inflater.inflate(R.layout.fragment_add_book, container, false);
         ean = (EditText) rootView.findViewById(R.id.ean);
-        mScanPreview = (CameraPreview) rootView.findViewById(R.id.scanPreviewPlaceholder);
 
         ean.addTextChangedListener(new TextWatcher() {
             @Override
@@ -93,19 +90,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             }
         });
 
-        Button scanButton = (Button)rootView.findViewById(R.id.scan_button);
-        if (mScanPreview.hasCamera()) {
-            scanButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    mScanPreview.setVisibility(View.VISIBLE);
-                }
-            });
-        }
-        else {
-            scanButton.setVisibility(View.GONE);
-        }
-
         rootView.findViewById(R.id.save_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -129,18 +113,8 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             ean.setHint("");
         }
 
-        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(
-                new ScanBarcodeReceiver(),
-                new IntentFilter(CameraPreview.BROADCAST_ACTION));
-
         return rootView;
     }
-
-    /********* Camera Helper Stuff *********/
-
-
-
-    /********** End Camer Helper Stuff ********/
 
     private void restartLoader(){
         getLoaderManager().restartLoader(LOADER_ID, null, this);
@@ -182,7 +156,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         ((TextView) rootView.findViewById(R.id.authors)).setLines(authorsArr.length);
         ((TextView) rootView.findViewById(R.id.authors)).setText(authors.replace(",","\n"));
         String imgUrl = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.IMAGE_URL));
-        if(Patterns.WEB_URL.matcher(imgUrl).matches()){
+        if(NetworkUtil.isNetworkAvailable(getActivity()) && Patterns.WEB_URL.matcher(imgUrl).matches()){
             new DownloadImage((ImageView) rootView.findViewById(R.id.bookCover)).execute(imgUrl);
             rootView.findViewById(R.id.bookCover).setVisibility(View.VISIBLE);
         }
@@ -215,18 +189,4 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         activity.setTitle(R.string.scan);
     }
 
-    @Override
-    public void onAutoFocus(boolean b, Camera camera) {
-
-    }
-
-    public class ScanBarcodeReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String result = intent.getStringExtra(CameraPreview.EXTRA_PARSE_RESULT);
-            if (result != null) {
-                ean.setText(result);
-            }
-        }
-    }
 }

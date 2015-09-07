@@ -1,4 +1,4 @@
-package it.jaschke.alexandria;
+package it.jaschke.alexandria.util;
 
 import android.annotation.TargetApi;
 import android.content.Context;
@@ -84,6 +84,7 @@ public class CameraHelper {
             bestResolutionDelta = resolutionDelta;
         }
 
+        Log.d(TAG, "Best size: " + bestSize.width + " " + bestSize.height);
         return bestSize;
     }
 

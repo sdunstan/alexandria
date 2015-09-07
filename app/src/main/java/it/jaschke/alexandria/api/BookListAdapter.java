@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import it.jaschke.alexandria.util.NetworkUtil;
 import it.jaschke.alexandria.R;
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.DownloadImage;
@@ -42,7 +43,9 @@ public class BookListAdapter extends CursorAdapter {
         ViewHolder viewHolder = (ViewHolder) view.getTag();
 
         String imgUrl = cursor.getString(cursor.getColumnIndex(AlexandriaContract.BookEntry.IMAGE_URL));
-        new DownloadImage(viewHolder.bookCover).execute(imgUrl);
+        if(NetworkUtil.isNetworkAvailable(context)) {
+            new DownloadImage(viewHolder.bookCover).execute(imgUrl);
+        }
 
         String bookTitle = cursor.getString(cursor.getColumnIndex(AlexandriaContract.BookEntry.TITLE));
         viewHolder.bookTitle.setText(bookTitle);
