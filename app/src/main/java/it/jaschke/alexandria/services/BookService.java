@@ -58,11 +58,13 @@ public class BookService extends IntentService {
     }
 
     /**
-     * Handle action Foo in the provided background thread with the provided
+     * Handle action DELETE_BOOK in the provided background thread with the provided
      * parameters.
      */
     private void deleteBook(String ean) {
         if(ean!=null) {
+//            getContentResolver().delete(AlexandriaContract.AuthorEntry.buildAuthorUri(Long.parseLong(ean)), null, null);
+//            getContentResolver().delete(AlexandriaContract.CategoryEntry.buildCategoryUri(Long.parseLong(ean)), null, null);
             getContentResolver().delete(AlexandriaContract.BookEntry.buildBookUri(Long.parseLong(ean)), null, null);
         }
     }

@@ -1,8 +1,14 @@
 package it.jaschke.alexandria;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.content.LocalBroadcastManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +32,10 @@ public class ScanBarcode extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        LocalBroadcastManager.getInstance(getActivity()).registerReceiver(
+                new ScanBarcodeReceiver(),
+                new IntentFilter(CameraPreview.BROADCAST_ACTION));
     }
 
     @Override
@@ -68,7 +78,20 @@ public class ScanBarcode extends Fragment {
      * activity.
      */
     public interface OnScanBarcodeListener {
-        public void onBarcodeDecoded(String barcodeString);
+        void onBarcodeDecoded(String barcodeString);
     }
+
+    public class ScanBarcodeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String result = intent.getStringExtra(CameraPreview.EXTRA_PARSE_RESULT);
+            if (result != null) {
+                onBarcodeDecoded(result);
+                getActivity().getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            }
+        }
+    }
+
+
 
 }

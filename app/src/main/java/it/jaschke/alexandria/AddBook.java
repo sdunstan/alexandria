@@ -1,20 +1,15 @@
 package it.jaschke.alexandria;
 
 import android.app.Activity;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.database.Cursor;
-import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
 import android.support.v4.app.LoaderManager;
 import android.support.v4.content.CursorLoader;
-import android.support.v4.content.LocalBroadcastManager;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -22,8 +17,8 @@ import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import it.jaschke.alexandria.camera.CameraPreview;
 import it.jaschke.alexandria.data.AlexandriaContract;
 import it.jaschke.alexandria.services.BookService;
 import it.jaschke.alexandria.services.DownloadImage;
@@ -72,18 +67,25 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
             @Override
             public void afterTextChanged(Editable s) {
-                String ean =s.toString();
-                //catch isbn10 numbers
-                if(ean.length()==10 && !ean.startsWith("978")){
-                    ean="978"+ean;
+                /*
+                 An ISBN is either 10 or 13 characters. (https://en.wikipedia.org/wiki/International_Standard_Book_Number)
+                 10-digit ISBNs can be converted to 13-digit ones by prefixing with 978.
+                 13-digit ISBNs begin with either 978 or 979. According to user reviews, we are not
+                 doing the user any favors by prefixing for them or clearing fields. Just add a helpful toast.
+                 */
+                String eanString = s.toString();
+
+                if (eanString.length() == 3 && !(eanString.startsWith("978") || eanString.startsWith("979"))) {
+                    Toast.makeText(getActivity(), "Please prefix 10-digit EANs with 978.", Toast.LENGTH_LONG).show();
                 }
-                if(ean.length()<13){
-                    clearFields();
+
+                if(eanString.length()<13){
                     return;
                 }
+
                 //Once we have an ISBN, start a book intent
                 Intent bookIntent = new Intent(getActivity(), BookService.class);
-                bookIntent.putExtra(BookService.EAN, ean);
+                bookIntent.putExtra(BookService.EAN, eanString);
                 bookIntent.setAction(BookService.FETCH_BOOK);
                 getActivity().startService(bookIntent);
                 AddBook.this.restartLoader();
@@ -105,6 +107,7 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
                 bookIntent.setAction(BookService.DELETE_BOOK);
                 getActivity().startService(bookIntent);
                 ean.setText("");
+                clearFields();
             }
         });
 
@@ -114,6 +117,16 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         }
 
         return rootView;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        String value = ((MainActivity)getActivity()).getLastScannedValue();
+        Log.d(TAG, "Resuming... last scanned value was " + value);
+        if (value != null) {
+            ean.setText(value);
+        }
     }
 
     private void restartLoader(){
@@ -126,9 +139,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
             return null;
         }
         String eanStr= ean.getText().toString();
-        if(eanStr.length()==10 && !eanStr.startsWith("978")){
-            eanStr="978"+eanStr;
-        }
         return new CursorLoader(
                 getActivity(),
                 AlexandriaContract.BookEntry.buildFullBookUri(Long.parseLong(eanStr)),
@@ -147,6 +157,9 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
 
         String bookTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.TITLE));
         ((TextView) rootView.findViewById(R.id.bookTitle)).setText(bookTitle);
+
+        int isbn = data.getInt(data.getColumnIndex(AlexandriaContract.BookEntry._ID));
+        ((TextView) rootView.findViewById(R.id .isbn)).setText(""+isbn);
 
         String bookSubTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.SUBTITLE));
         ((TextView) rootView.findViewById(R.id.bookSubTitle)).setText(bookSubTitle);

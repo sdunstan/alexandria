@@ -10,7 +10,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.hardware.Camera;
 import android.os.AsyncTask;
-import android.support.v4.app.FragmentManager;
 import android.support.v4.content.LocalBroadcastManager;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -25,7 +24,6 @@ import com.google.zxing.FormatException;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.PlanarYUVLuminanceSource;
 import com.google.zxing.Result;
-import com.google.zxing.client.android.camera.CameraConfigurationUtils;
 import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.oned.MultiFormatOneDReader;
 
@@ -36,20 +34,15 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import it.jaschke.alexandria.MainActivity;
 import it.jaschke.alexandria.util.CameraHelper;
 
 public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback, Camera.AutoFocusCallback {
     public static final String BROADCAST_ACTION = "it.jaschkle.alexandria.BROADCAST_ACTION";
     public static final String EXTRA_PARSE_RESULT = "it.jaschkle.alexandria.PARSE_RESULT";
     private static final String TAG = CameraPreview.class.getName();
-    // 4:3 target, e.g., 640x480
-    private static final int TARGET_RATIO_WIDTH = 4;
-    private static final int TARGET_RATIO_HEIGHT = 3;
 
-    private Camera mCamera;
-    private boolean isPortriat = true;
-
-    private Context mContext;
+    private boolean isPortrait = true;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -68,12 +61,16 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         init(context);
     }
 
-    public boolean hasCamera() {
-        return mCamera != null;
+    private boolean hasCamera() {
+        return getCamera() != null;
+    }
+
+    private Camera getCamera() {
+        MainActivity mainActivity = (MainActivity) getContext();
+        return mainActivity.getCamera();
     }
 
     public void init(Context context) {
-        mContext = context;
         // Install a SurfaceHolder.Callback so we get notified when the
         // underlying surface is created and destroyed.
         getHolder().addCallback(this);
@@ -85,29 +82,6 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             Log.w(TAG, "Device does not have a camera?");
             return;
         }
-
-        mCamera = CameraHelper.getCameraInstance();
-        if (mCamera == null) {
-            Log.w(TAG, "Can't get camera instance.");
-            return;
-        }
-
-        Camera.Parameters parameters = mCamera.getParameters();
-        CameraConfigurationUtils.setBestPreviewFPS(parameters);
-        CameraConfigurationUtils.setBarcodeSceneMode(parameters);
-        CameraConfigurationUtils.setVideoStabilization(parameters);
-        CameraConfigurationUtils.setMetering(parameters);
-        CameraConfigurationUtils.setBestExposure(parameters, false);
-        CameraConfigurationUtils.setZoom(parameters, 2);
-        CameraConfigurationUtils.setFocus(parameters, true, false, false);
-
-        Camera.Size size = CameraHelper.findBestSize(mCamera, TARGET_RATIO_WIDTH, TARGET_RATIO_HEIGHT);
-        Log.d(TAG, "Using this size for preview: " + size.width + "x" + size.height);
-        parameters.setPreviewSize(size.width, size.height);
-        parameters.setPictureSize(size.width, size.height);
-        getHolder().setFixedSize(size.width, size.height);
-
-        mCamera.setParameters(parameters);
 
         scheduleAutofocus();
     }
@@ -138,17 +112,15 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             return;
         // The Surface has been created, now tell the camera where to draw the preview.
         try {
-            mCamera.setPreviewDisplay(holder);
+            getCamera().setPreviewDisplay(holder);
+            getCamera().startPreview();
         } catch (IOException e) {
             Log.d("DBG", "Error setting camera preview: " + e.getMessage());
         }
     }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
-        if (mCamera != null) {
-            mCamera.release();
-            mCamera = null;
-        }
+        getCamera().stopPreview();
     }
 
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
@@ -165,18 +137,18 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
         // stop preview before making changes
         try {
-            mCamera.stopPreview();
+            getCamera().stopPreview();
         } catch (Exception e){
             // ignore: tried to stop a non-existent preview
         }
 
         try {
             // Hard code camera surface rotation 90 degs to match Activity view in portrait
-            // mCamera.setDisplayOrientation(90);
+            // getCamera().setDisplayOrientation(90);
             rotate();
 
-            mCamera.setPreviewDisplay(holder);
-            mCamera.startPreview();
+            getCamera().setPreviewDisplay(holder);
+            getCamera().startPreview();
         } catch (Exception e){
             Log.d("DBG", "Error starting camera preview: " + e.getMessage());
         }
@@ -202,14 +174,14 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
         degrees = (info.orientation - degrees + 360) % 360;
         Log.i(TAG, "Display orientation is being set to " + degrees);
 
-        isPortriat = (degrees == 90 || degrees == 270);
-        mCamera.setDisplayOrientation(degrees);
+        isPortrait = (degrees == 90 || degrees == 270);
+        getCamera().setDisplayOrientation(degrees);
     }
 
     public void autoFocus() {
         if (!hasCamera())
             return;
-        mCamera.autoFocus(this);
+        getCamera().autoFocus(this);
     }
 
     private void broadcastResult(String result) {
@@ -244,7 +216,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             Result rawResult = null;
             RawImage raw = rawImages[0];
 
-            if (isPortriat)
+            if (isPortrait)
                 raw = raw.rotate();
 
             PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
@@ -278,8 +250,6 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             }
             else {
                 broadcastResult(result);
-//                ean.setText(result);
-//                mContext.getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
             }
         }
     }
