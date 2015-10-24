@@ -71,6 +71,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     }
 
     public void init(Context context) {
+        Log.d(TAG, "Init CameraPreview looking for bar codes.");
         // Install a SurfaceHolder.Callback so we get notified when the
         // underlying surface is created and destroyed.
         getHolder().addCallback(this);
@@ -87,12 +88,13 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     }
 
     private void scheduleAutofocus() {
+        Log.d(TAG, "Scheduling autofocus.");
         scheduler.schedule(new Runnable() {
             @Override
             public void run() {
                 autoFocus();
             }
-        }, 1, TimeUnit.SECONDS);
+        }, 3, TimeUnit.SECONDS);
     }
 
     /**
@@ -120,6 +122,8 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
+        if (!hasCamera())
+            return;
         getCamera().stopPreview();
     }
 

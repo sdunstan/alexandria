@@ -20,9 +20,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import it.jaschke.alexandria.MainActivity;
-import it.jaschke.alexandria.util.NetworkUtil;
 import it.jaschke.alexandria.R;
 import it.jaschke.alexandria.data.AlexandriaContract;
+import it.jaschke.alexandria.util.NetworkUtil;
 
 
 /**
@@ -61,11 +61,21 @@ public class BookService extends IntentService {
      * Handle action DELETE_BOOK in the provided background thread with the provided
      * parameters.
      */
-    private void deleteBook(String ean) {
-        if(ean!=null) {
-//            getContentResolver().delete(AlexandriaContract.AuthorEntry.buildAuthorUri(Long.parseLong(ean)), null, null);
-//            getContentResolver().delete(AlexandriaContract.CategoryEntry.buildCategoryUri(Long.parseLong(ean)), null, null);
-            getContentResolver().delete(AlexandriaContract.BookEntry.buildBookUri(Long.parseLong(ean)), null, null);
+    private void deleteBook(String eanString) {
+        if(org.apache.commons.lang3.StringUtils.isNotEmpty(eanString)) {
+            Long ean = Long.parseLong(eanString);
+            tryDelete(AlexandriaContract.AuthorEntry.buildAuthorUri(ean));
+            tryDelete(AlexandriaContract.CategoryEntry.buildCategoryUri(ean));
+            tryDelete(AlexandriaContract.BookEntry.buildBookUri(ean));
+        }
+    }
+
+    private void tryDelete(Uri uri) {
+        try {
+            getContentResolver().delete(uri, null, null);
+        }
+        catch (UnsupportedOperationException unsupportedOperation) {
+            // Eat it, we don't always have an author or category.
         }
     }
 
@@ -194,12 +204,15 @@ public class BookService extends IntentService {
                 imgUrl = bookInfo.getJSONObject(IMG_URL_PATH).getString(IMG_URL);
             }
 
+            Log.d(LOG_TAG, "Saving book with ean " + ean);
             writeBackBook(ean, title, subtitle, desc, imgUrl);
 
             if(bookInfo.has(AUTHORS)) {
+                Log.d(LOG_TAG, "Saving author for ean " + ean);
                 writeBackAuthors(ean, bookInfo.getJSONArray(AUTHORS));
             }
             if(bookInfo.has(CATEGORIES)){
+                Log.d(LOG_TAG, "Saving category for ean " + ean);
                 writeBackCategories(ean,bookInfo.getJSONArray(CATEGORIES) );
             }
 

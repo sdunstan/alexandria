@@ -31,11 +31,6 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
     private final int LOADER_ID = 1;
     private View rootView;
     private final String EAN_CONTENT="eanContent";
-    private static final String SCAN_FORMAT = "scanFormat";
-    private static final String SCAN_CONTENTS = "scanContents";
-
-    private String mScanFormat = "Format:";
-    private String mScanContents = "Contents:";
 
     public AddBook(){
     }
@@ -102,11 +97,16 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         rootView.findViewById(R.id.delete_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent bookIntent = new Intent(getActivity(), BookService.class);
-                bookIntent.putExtra(BookService.EAN, ean.getText().toString());
-                bookIntent.setAction(BookService.DELETE_BOOK);
-                getActivity().startService(bookIntent);
-                ean.setText("");
+                TextView bookTitleView = (TextView) rootView.findViewById(R.id.bookTitle);
+                String eanNumber = (String) bookTitleView.getTag();
+                Log.d(TAG, "Attempting to delete book with ISBN " + eanNumber);
+                if (eanNumber != null) {
+                    Intent bookIntent = new Intent(getActivity(), BookService.class);
+                    bookIntent.putExtra(BookService.EAN, eanNumber);
+                    bookIntent.setAction(BookService.DELETE_BOOK);
+                    getActivity().startService(bookIntent);
+                    ean.setText("");
+                }
                 clearFields();
             }
         });
@@ -156,10 +156,14 @@ public class AddBook extends Fragment implements LoaderManager.LoaderCallbacks<C
         }
 
         String bookTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.TITLE));
-        ((TextView) rootView.findViewById(R.id.bookTitle)).setText(bookTitle);
+        TextView bookTitleView = (TextView) rootView.findViewById(R.id.bookTitle);
+        bookTitleView.setText(bookTitle);
+        String isbn = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry._ID));
+        Log.d(TAG, "setting isbn from found book into book title tag " + isbn);
+        bookTitleView.setTag(isbn);
 
-        int isbn = data.getInt(data.getColumnIndex(AlexandriaContract.BookEntry._ID));
-        ((TextView) rootView.findViewById(R.id .isbn)).setText(""+isbn);
+//        int isbn = data.getInt(data.getColumnIndex(AlexandriaContract.BookEntry._ID));
+//        ((TextView) rootView.findViewById(R.id .isbn)).setText(""+isbn);
 
         String bookSubTitle = data.getString(data.getColumnIndex(AlexandriaContract.BookEntry.SUBTITLE));
         ((TextView) rootView.findViewById(R.id.bookSubTitle)).setText(bookSubTitle);

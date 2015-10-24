@@ -23,10 +23,11 @@ import android.widget.Toast;
 import com.google.zxing.client.android.camera.CameraConfigurationUtils;
 
 import it.jaschke.alexandria.api.Callback;
+import it.jaschke.alexandria.camera.CameraPreview;
 import it.jaschke.alexandria.util.CameraHelper;
 
 
-public class MainActivity extends ActionBarActivity implements NavigationDrawerFragment.NavigationDrawerCallbacks, Callback, ScanBarcode.OnScanBarcodeListener {
+public class MainActivity extends ActionBarActivity implements NavigationDrawerFragment.NavigationDrawerCallbacks, Callback {
     private static final String TAG = MainActivity.class.getSimpleName();
 
     /**
@@ -39,7 +40,8 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
      */
     private CharSequence title;
     public static boolean IS_TABLET = false;
-    private BroadcastReceiver messageReciever;
+    private BroadcastReceiver messageReceiver;
+    private ScanBarcodeReceiver scanBarcodeReceiver;
 
     public static final String MESSAGE_EVENT = "MESSAGE_EVENT";
     public static final String MESSAGE_KEY = "MESSAGE_EXTRA";
@@ -61,9 +63,15 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
             setContentView(R.layout.activity_main);
         }
 
-        messageReciever = new MessageReciever();
-        IntentFilter filter = new IntentFilter(MESSAGE_EVENT);
-        LocalBroadcastManager.getInstance(this).registerReceiver(messageReciever, filter);
+        messageReceiver = new MessageReciever();
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                messageReceiver,
+                new IntentFilter(MESSAGE_EVENT));
+
+        scanBarcodeReceiver = new ScanBarcodeReceiver();
+        LocalBroadcastManager.getInstance(this).registerReceiver(
+                scanBarcodeReceiver,
+                new IntentFilter(CameraPreview.BROADCAST_ACTION));
 
         navigationDrawerFragment = (NavigationDrawerFragment)
                 getSupportFragmentManager().findFragmentById(R.id.navigation_drawer);
@@ -143,7 +151,9 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
 
     @Override
     protected void onDestroy() {
-        LocalBroadcastManager.getInstance(this).unregisterReceiver(messageReciever);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(messageReceiver);
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(scanBarcodeReceiver);
+
         super.onDestroy();
     }
 
@@ -178,7 +188,6 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
                 .commit();
     }
 
-    @Override
     public void onBarcodeDecoded(String barcodeString) {
         mScannedValue = barcodeString;
     }
@@ -270,5 +279,17 @@ public class MainActivity extends ActionBarActivity implements NavigationDrawerF
         mCamera.setParameters(parameters);
     }
 
+    public class ScanBarcodeReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.d(TAG, "ScanBarcodeReceiver received message.");
+            String result = intent.getStringExtra(CameraPreview.EXTRA_PARSE_RESULT);
+            if (result != null) {
+                Log.d(TAG, "ScanBarcodeReceiver got result.");
+                onBarcodeDecoded(result);
+                getSupportFragmentManager().popBackStack("ScanBarcode", FragmentManager.POP_BACK_STACK_INCLUSIVE);
+            }
+        }
+    }
 
 }
